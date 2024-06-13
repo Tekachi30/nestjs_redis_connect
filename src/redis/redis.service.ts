@@ -1,17 +1,16 @@
-//redis.service.ts
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import IORedis, { Redis } from 'ioredis';
-require('dotenv').config();
 
 @Injectable()
 export class RedisService {
   private client: Redis;
 
-  constructor() {
+  constructor(private configService: ConfigService) {
     this.client = new IORedis({
-      host: process.env.REDIS_HOST,
-      port: 6379,
-      password: process.env.REDIS_PASSWORD,
+      host: this.configService.get<string>('REDIS_HOST'),
+      port: this.configService.get<number>('REDIS_PORT', 6379),
+      password: this.configService.get<string>('REDIS_PASSWORD'),
     });
   }
 
