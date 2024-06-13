@@ -1,5 +1,7 @@
+//redis.service.ts
 import { Injectable } from '@nestjs/common';
 import IORedis, { Redis } from 'ioredis';
+require('dotenv').config();
 
 @Injectable()
 export class RedisService {
@@ -7,7 +9,7 @@ export class RedisService {
 
   constructor() {
     this.client = new IORedis({
-      host: process.env.REDIS_CONNECTION,
+      host: process.env.REDIS_HOST,
       port: 6379,
       password: process.env.REDIS_PASSWORD,
     });
