@@ -8,7 +8,8 @@ export class RedisService {
   //khai báo
   private client: Redis;
 
-  constructor(private configService: ConfigService) { // cấu hình
+  constructor(private configService: ConfigService) {
+    // cấu hình
     this.client = new IORedis({
       host: this.configService.get<string>('REDIS_HOST'),
       port: this.configService.get<number>('REDIS_PORT', 6379),
@@ -17,7 +18,8 @@ export class RedisService {
     });
   }
 
-  async get(key: string): Promise<string> { // lấy từng key
+  async get(key: string): Promise<string> {
+    // lấy từng key
     try {
       return await this.client.get(key);
     } catch (error) {
@@ -25,19 +27,26 @@ export class RedisService {
     }
   }
 
-  async set(key: string, value: string, ttl?: number): Promise<boolean> { // ttl => time to live (dùng để settime hết hạn)
-    return (await this.client.set(key, value, 'EX', ttl)) === 'OK';
+  async set(key: string, value: string, ttl?: number): Promise<boolean> {
+    // ttl => time to live (dùng để settime hết hạn)
+    if (ttl) {
+      return (await this.client.set(key, value, 'EX', ttl)) === 'OK';
+    }
+    return (await this.client.set(key, value)) === 'OK';
   }
 
-  async del(key: string): Promise<number> { // xóa 1
+  async del(key: string): Promise<number> {
+    // xóa 1
     return await this.client.del(key);
   }
 
-  async flushall(): Promise<string> { // dùng để xóa hết
+  async flushall(): Promise<string> {
+    // dùng để xóa hết
     return await this.client.flushall();
   }
 
-  async getAllKeys(pattern: string='*'): Promise<string[]> { //lấy tất cả key
+  async getAllKeys(pattern: string = '*'): Promise<string[]> {
+    //lấy tất cả key
     return await this.client.keys(pattern);
   }
 
