@@ -8,7 +8,6 @@ export class UsersService {
   constructor(private readonly redisService: RedisService) {}
 
   async create(createUserDto: CreateUserDto) {
-    // return 'This action adds a new user';
     try {
       const key = createUserDto.name;
       // Kiểm tra xem tên người dùng đã tồn tại chưa
@@ -28,11 +27,12 @@ export class UsersService {
   }
 
   async findAll() {
-    // return `This action returns all users`;
     try {
       const datas = await this.redisService.getAllKeys();
-      if (datas) {
-        const users = [];
+      const users = [];
+      if (!datas || datas.length === 0) {
+        return 'không tìm thấy user nào';
+      }else{
         for (const data of datas) {
           const userData = await this.redisService.get(data);
           if (userData) {
@@ -40,8 +40,6 @@ export class UsersService {
           }
         }
         return users;
-      } else {
-        return 'không tìm thấy user nào';
       }
     } catch (error) {
       console.log(error);
@@ -51,7 +49,6 @@ export class UsersService {
 
   async findOne(name: string) {
     // tìm 1 user
-    // return `This action returns a #${id} user`;
     try {
       const key = name;
       const data = await this.redisService.get(key);
@@ -67,7 +64,6 @@ export class UsersService {
   }
 
   async update(name: string, updateUserDto: UpdateUserDto) {
-    // return `This action updates a #${id} user`;
     try {
       const existingUser = await this.redisService.get(name);
       if (!existingUser) {
@@ -103,7 +99,6 @@ export class UsersService {
   }
 
   async remove(key: string) {
-    // return `This action removes a #${id} user`;
     try {
       const data = await this.redisService.get(key);
       if (data) {
