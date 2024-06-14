@@ -5,9 +5,10 @@ import IORedis, { Redis } from 'ioredis';
 
 @Injectable()
 export class RedisService {
+  //khai báo
   private client: Redis;
 
-  constructor(private configService: ConfigService) {
+  constructor(private configService: ConfigService) { // cấu hình
     this.client = new IORedis({
       host: this.configService.get<string>('REDIS_HOST'),
       port: this.configService.get<number>('REDIS_PORT', 6379),
@@ -16,7 +17,7 @@ export class RedisService {
     });
   }
 
-  async get(key: string): Promise<string> {
+  async get(key: string): Promise<string> { // lấy từng key
     try {
       return await this.client.get(key);
     } catch (error) {
@@ -28,7 +29,7 @@ export class RedisService {
     return (await this.client.set(key, value, 'EX', ttl)) === 'OK';
   }
 
-  async del(key: string): Promise<number> {
+  async del(key: string): Promise<number> { // xóa 1
     return await this.client.del(key);
   }
 
@@ -36,21 +37,20 @@ export class RedisService {
     return await this.client.flushall();
   }
 
-  // async getAllKeys(pattern: string): Promise<string[]> {
-  //   return await this.client.keys(pattern);
-  // }
-
-  // cách khác tìm toàn bộ: (khuyến khích ?????)
-  async scanKeys(pattern: string): Promise<string[]> {
-    const keys: string[] = [];
-    let cursor = '0';
-    do {
-      const reply = await this.client.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
-      cursor = reply[0];
-      keys.push(...reply[1]);
-    } while (cursor !== '0');
-    return keys;
+  async getAllKeys(pattern: string='*'): Promise<string[]> { //lấy tất cả key
+    return await this.client.keys(pattern);
   }
 
-
+  // cách khác tìm toàn bộ: (khuyến khích ?????)
+  // async scanKeys(pattern: string = '*'): Promise<string[]> {
+  //   const keys: string[] = [];
+  //   let cursor = '0';
+  //   do {
+  //     const reply = await this.client.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+  //     console.log(reply);
+  //     cursor = reply[0];
+  //     keys.push(...reply[1]);
+  //   } while (cursor !== '0');
+  //   return keys;
+  // }
 }

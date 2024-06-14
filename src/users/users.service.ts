@@ -12,7 +12,7 @@ export class UsersService {
     try {
       const key = createUserDto.name;
       const userData = JSON.stringify(createUserDto);
-      const ttl = 180;
+      const ttl = 3600;
       await this.redisService.set(key,userData,ttl)
       return 'thêm thành công'
     } catch (error) {
@@ -24,7 +24,7 @@ export class UsersService {
   async findAll() {
     // return `This action returns all users`;
     try {
-      const datas = await this.redisService.scanKeys('user:*');
+      const datas = await this.redisService.getAllKeys();
       if(datas){
         const users = [];
         for (const data of datas) {
