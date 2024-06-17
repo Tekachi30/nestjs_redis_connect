@@ -7,9 +7,9 @@ import IORedis, { Redis } from 'ioredis';
 export class RedisService {
   //khai báo
   private client: Redis;
-
+  
+  // cấu hình 
   constructor(private configService: ConfigService) {
-    // cấu hình
     this.client = new IORedis({
       host: this.configService.get<string>('REDIS_HOST'),
       port: this.configService.get<number>('REDIS_PORT', 6379),
@@ -45,17 +45,17 @@ export class RedisService {
     return await this.client.flushall();
   }
 
-  async getAllKeys(pattern: string = '*'): Promise<string[]> {
+  async getAllKeys(key: string = '*'): Promise<string[]> {
     //lấy tất cả key
-    return await this.client.keys(pattern);
+    return await this.client.keys(key);
   }
 
   // cách khác tìm toàn bộ: (khuyến khích ?????)
-  // async scanKeys(pattern: string = '*'): Promise<string[]> {
+  // async scanKeys(key: string = '*'): Promise<string[]> {
   //   const keys: string[] = [];
   //   let cursor = '0';
   //   do {
-  //     const reply = await this.client.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+  //     const reply = await this.client.scan(cursor, 'MATCH', key, 'COUNT', 100);
   //     console.log(reply);
   //     cursor = reply[0];
   //     keys.push(...reply[1]);

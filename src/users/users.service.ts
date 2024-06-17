@@ -32,7 +32,7 @@ export class UsersService {
       const users = [];
       if (!datas || datas.length === 0) {
         return 'không tìm thấy user nào';
-      }else{
+      } else {
         for (const data of datas) {
           const userData = await this.redisService.get(data);
           if (userData) {
@@ -67,7 +67,7 @@ export class UsersService {
     try {
       const existingUser = await this.redisService.get(name);
       if (!existingUser) {
-        return 'Không tìm thấy user để cập nhật';
+        return `Không tìm thấy user ${name}`;
       } else {
         const updatedUser = { ...JSON.parse(existingUser), ...updateUserDto };
 
