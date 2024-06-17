@@ -10,7 +10,6 @@ export class UsersService {
   async create(createUserDto: CreateUserDto) {
     try {
       const key = createUserDto.name;
-      // Kiểm tra xem tên người dùng đã tồn tại chưa
       const existingUser = await this.redisService.get(key);
       if (existingUser) {
         return 'Tên người dùng đã tồn tại';
