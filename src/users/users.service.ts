@@ -9,7 +9,7 @@ export class UsersService {
 
   async create(createUserDto: CreateUserDto) {
     try {
-      const key = createUserDto.name;
+      const key = `User:${createUserDto.name}`;
       const existingUser = await this.redisService.get(key);
       if (existingUser) {
         return 'Tên người dùng đã tồn tại';
@@ -27,7 +27,7 @@ export class UsersService {
 
   async findAll() {
     try {
-      const datas = await this.redisService.getAllKeys();
+      const datas = await this.redisService.getAllKeys('User:*');
       const users = [];
       if (!datas || datas.length === 0) {
         return 'không tìm thấy user nào';
@@ -46,10 +46,9 @@ export class UsersService {
     }
   }
 
-  async findOne(name: string) {
+  async findOne(key: string) {
     // tìm 1 user
     try {
-      const key = name;
       const data = await this.redisService.get(key);
       if (data) {
         return JSON.parse(data);
@@ -64,7 +63,7 @@ export class UsersService {
 
   async update(name: string, updateUserDto: UpdateUserDto) {
     try {
-      const existingUser = await this.redisService.get(name);
+      const existingUser = await this.redisService.get(`User:${name}`);
       if (!existingUser) {
         return `Không tìm thấy user ${name}`;
       } else {
@@ -72,7 +71,9 @@ export class UsersService {
 
         // Kiểm tra nếu tên mới trùng với tên người dùng khác
         if (updateUserDto.name && updateUserDto.name !== name) {
-          const newNameUser = await this.redisService.get(updateUserDto.name);
+          const newNameUser = await this.redisService.get(
+            `User:${updateUserDto.name}`,
+          );
           if (newNameUser) {
             return 'Tên người dùng đã tồn tại';
           }
@@ -83,10 +84,14 @@ export class UsersService {
 
           // Nếu tên mới khác tên cũ, xóa dữ liệu cũ và thêm dữ liệu mới
           if (updateUserDto.name && updateUserDto.name !== name) {
-            await this.redisService.del(name);
-            await this.redisService.set(updateUserDto.name, userData, ttl);
+            await this.redisService.del(`User:${name}`);
+            await this.redisService.set(
+              `User:${updateUserDto.name}`,
+              userData,
+              ttl,
+            );
           } else {
-            await this.redisService.set(name, userData, ttl);
+            await this.redisService.set(`User:${name}`, userData, ttl);
           }
           return `Đã cập nhật user ${name}`;
         }
@@ -99,9 +104,9 @@ export class UsersService {
 
   async remove(key: string) {
     try {
-      const data = await this.redisService.get(key);
+      const data = await this.redisService.get(`user:${key}`);
       if (data) {
-        await this.redisService.del(key); // Xóa 1 key
+        await this.redisService.del(`user:${key}`); // Xóa 1 key
         return `Đã xóa user ${key}`;
       } else {
         return `Không tìm thấy user ${key}`;
@@ -114,8 +119,16 @@ export class UsersService {
 
   async removeAll() {
     try {
-      await this.redisService.flushall(); // Xóa tất cả các key
-      return 'Tất cả các key đã được xóa';
+      const keys = await this.redisService.getAllKeys('User:*'); // Lấy danh sách tất cả keys
+      if (keys.length === 0) {
+        return 'Không tìm thấy key nào';
+      } else {
+        const userKeys = keys.filter((key) => key.startsWith('user:')); // Lọc ra các keys trong thư mục user
+        for (const key of userKeys) {
+          await this.redisService.del(key); // Xóa key
+        }
+        return 'Các keys trong thư mục "user" đã được xóa';
+      }
     } catch (error) {
       console.log(error);
       return 'ta đã thấy lỗi fix đê';

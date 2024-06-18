@@ -1,5 +1,4 @@
-#.ENV
-REDIS_CONNECTION=local
-REDIS_HOST=10.96.115.146
-REDIS_PORT=6379
-REDIS_PASSWORD=redisfrt2022
+# Demo Nestjs và Redis và MYSQLSERVER
+
+## Lệnh tạo model:
+- nest g resource ???

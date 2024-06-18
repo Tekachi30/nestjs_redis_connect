@@ -13,9 +13,12 @@ export function IsNotBlank(validationOptions?: ValidationOptions) {
       propertyName: propertyName,
       options: validationOptions,
       validator: {
-        validate: (value: any) =>
-          typeof value === 'string' && value.trim().length > 0,
-        defaultMessage: () => 'Không được để trống',
+        validate(value: any, args: ValidationArguments) {
+          return typeof value === 'string' && value.trim().length > 0;
+        },
+        defaultMessage(args: ValidationArguments) {
+          return `${args.property} không được để trống`;
+        },
       },
     });
   };

@@ -6,6 +6,8 @@ import { AppService } from './app.service';
 import { RedisModule } from './redis/redis.module';
 import { ConfigModule } from '@nestjs/config';
 import { UsersModule } from './users/users.module';
+import { GradesModule } from './grades/grades.module';
+import { CustomTypeOrmModule } from './typeorm.config';
 
 
 @Module({
@@ -13,8 +15,10 @@ import { UsersModule } from './users/users.module';
     isGlobal: true,
     envFilePath: '.env',
   }),
+  CustomTypeOrmModule,
   RedisModule,
-  UsersModule,],
+  UsersModule,
+  GradesModule,],
   controllers: [AppController],
   providers: [AppService],
 })
