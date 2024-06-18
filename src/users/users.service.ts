@@ -3,20 +3,30 @@ import { Injectable } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { RedisService } from '../redis/redis.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { User } from './entities/user.entity';
+import { Repository } from 'typeorm';
 @Injectable()
 export class UsersService {
-  constructor(private readonly redisService: RedisService) {}
+  constructor(
+    private readonly redisService: RedisService,
+
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
+  ) {}
 
   async create(createUserDto: CreateUserDto) {
     try {
-      const key = `User:${createUserDto.name}`;
+      const key = createUserDto.name;
       const existingUser = await this.redisService.get(key);
       if (existingUser) {
         return 'Tên người dùng đã tồn tại';
       } else {
-        const userData = JSON.stringify(createUserDto);
+        
+        const savedUser = await this.userRepository.save(createUserDto);
+        const userData = JSON.stringify({id: savedUser.id, ...createUserDto});
         const ttl = 3600;
-        await this.redisService.set(key, userData, ttl);
+        await this.redisService.set(`User:${key}`, userData, ttl);
         return 'thêm thành công';
       }
     } catch (error) {
@@ -27,17 +37,31 @@ export class UsersService {
 
   async findAll() {
     try {
-      const datas = await this.redisService.getAllKeys('User:*');
+      const keys = await this.redisService.getAllKeys('User:*');
       const users = [];
-      if (!datas || datas.length === 0) {
+  
+      if (!keys || keys.length === 0) {
         return 'không tìm thấy user nào';
       } else {
-        for (const data of datas) {
-          const userData = await this.redisService.get(data);
+        for (const key of keys) {
+          const userData = await this.redisService.get(key);
           if (userData) {
             users.push(JSON.parse(userData));
           }
         }
+  
+        // Kiểm tra trong database để tìm user không có trong Redis
+        const dbUsers = await this.userRepository.find();
+        for (const dbUser of dbUsers) {
+          const userInRedis = users.find(user => user.id === dbUser.id);
+          if (!userInRedis) {
+            // Đẩy user từ database lên Redis
+            const redisKey = `User:${dbUser.name}`;
+            await this.redisService.set(redisKey, JSON.stringify(dbUser), 3600);
+            users.push(dbUser);
+          }
+        }
+  
         return users;
       }
     } catch (error) {
@@ -53,7 +77,17 @@ export class UsersService {
       if (data) {
         return JSON.parse(data);
       } else {
-        return 'không tìm thấy user';
+        // Nếu không tìm thấy trong Redis, tìm user trong database
+        const dbData = await this.userRepository.findOneBy({ name: key });
+        if (dbData) {
+          const userData = JSON.stringify(dbData);
+          const ttl = 3600;
+          // Đẩy dữ liệu từ database lên Redis
+          await this.redisService.set(`User:${key}`, userData, ttl);
+          return dbData;
+        } else {
+          return 'Không tìm thấy user';
+        }
       }
     } catch (error) {
       console.log(error);
@@ -67,7 +101,8 @@ export class UsersService {
       if (!existingUser) {
         return `Không tìm thấy user ${name}`;
       } else {
-        const updatedUser = { ...JSON.parse(existingUser), ...updateUserDto };
+        const parsedUser = JSON.parse(existingUser);
+        const modifyUser = { ...parsedUser, ...updateUserDto };
 
         // Kiểm tra nếu tên mới trùng với tên người dùng khác
         if (updateUserDto.name && updateUserDto.name !== name) {
@@ -76,25 +111,28 @@ export class UsersService {
           );
           if (newNameUser) {
             return 'Tên người dùng đã tồn tại';
-          }
-        } else {
-          // Cập nhật thông tin người dùng
-          const userData = JSON.stringify(updatedUser);
-          const ttl = 3600;
-
-          // Nếu tên mới khác tên cũ, xóa dữ liệu cũ và thêm dữ liệu mới
-          if (updateUserDto.name && updateUserDto.name !== name) {
+          } else {
+            // Nếu tên mới khác tên cũ, xóa dữ liệu cũ và thêm dữ liệu mới trong Redis
             await this.redisService.del(`User:${name}`);
             await this.redisService.set(
               `User:${updateUserDto.name}`,
-              userData,
-              ttl,
+              JSON.stringify(modifyUser),
+              3600,
             );
-          } else {
-            await this.redisService.set(`User:${name}`, userData, ttl);
           }
-          return `Đã cập nhật user ${name}`;
+        } else {
+          // Cập nhật thông tin người dùng trong Redis với tên hiện tại
+          await this.redisService.set(
+            `User:${name}`,
+            JSON.stringify(modifyUser),
+            3600,
+          );
         }
+
+        // Cập nhật thông tin người dùng trong database
+        await this.userRepository.update(parsedUser.id, updateUserDto);
+
+        return `Đã cập nhật user ${name}`;
       }
     } catch (error) {
       console.log(error);
@@ -104,9 +142,11 @@ export class UsersService {
 
   async remove(key: string) {
     try {
-      const data = await this.redisService.get(`user:${key}`);
+      const data = await this.redisService.get(`User:${key}`);
+      const parsedUser = JSON.parse(data);
       if (data) {
-        await this.redisService.del(`user:${key}`); // Xóa 1 key
+        await this.redisService.del(`User:${key}`); // Xóa 1 key
+        await this.userRepository.delete(parsedUser);
         return `Đã xóa user ${key}`;
       } else {
         return `Không tìm thấy user ${key}`;
@@ -123,10 +163,12 @@ export class UsersService {
       if (keys.length === 0) {
         return 'Không tìm thấy key nào';
       } else {
-        const userKeys = keys.filter((key) => key.startsWith('user:')); // Lọc ra các keys trong thư mục user
+        const userKeys = keys.filter((key) => key.startsWith('User:')); // Lọc ra các keys trong thư mục user
         for (const key of userKeys) {
-          await this.redisService.del(key); // Xóa key
+          await this.redisService.del(key); // Xóa key trong redis
         }
+        // Xóa tất cả các bản ghi user trong cơ sở dữ liệu
+        await this.userRepository.clear();
         return 'Các keys trong thư mục "user" đã được xóa';
       }
     } catch (error) {

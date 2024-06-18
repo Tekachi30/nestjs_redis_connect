@@ -2,21 +2,33 @@ import { Injectable } from '@nestjs/common';
 import { CreateGradeDto } from './dto/create-grade.dto';
 import { UpdateGradeDto } from './dto/update-grade.dto';
 import { RedisService } from 'src/redis/redis.service';
+import { Grade } from './entities/grade.entity';
+import { Repository } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
 
 @Injectable()
 export class GradesService {
-  constructor(private readonly redisService: RedisService) {}
+  constructor(
+    private readonly redisService: RedisService,
+
+    @InjectRepository(Grade)
+    private gradeRepository: Repository<Grade>,
+  ) {}
 
   async create(createGradeDto: CreateGradeDto) {
     try {
-      const key = `Grade:${createGradeDto.subject}`;
+      const key = createGradeDto.subject;
       const existingSubject = await this.redisService.get(key);
       if (existingSubject) {
         return 'Môn học đã tồn tại';
       } else {
-        const subjectData = JSON.stringify(createGradeDto);
+        const savedgrade = await this.gradeRepository.save(createGradeDto);
+        const subjectData = JSON.stringify({
+          id: savedgrade.id,
+          ...createGradeDto,
+        });
         const ttl = 3600;
-        await this.redisService.set(key, subjectData, ttl);
+        await this.redisService.set(`Grade:${key}`, subjectData, ttl);
         return 'thêm thành công';
       }
     } catch (error) {
@@ -38,6 +50,21 @@ export class GradesService {
             grades.push(JSON.parse(gradeData));
           }
         }
+        // Kiểm tra trong database để tìm grade không có trong Redis
+        const dbGrades = await this.gradeRepository.find();
+        for (const dbGrade of dbGrades) {
+          const gradeInRedis = grades.find((grade) => grade.id === dbGrade.id);
+          if (!gradeInRedis) {
+            // Đẩy grade từ database lên Redis
+            const redisKey = dbGrade.subject;
+            await this.redisService.set(
+              `Grade:${redisKey}`,
+              JSON.stringify(dbGrade),
+              3600,
+            );
+            grades.push(dbGrade);
+          }
+        }
         return grades;
       }
     } catch (error) {
@@ -51,7 +78,17 @@ export class GradesService {
       if (data) {
         return JSON.parse(data);
       } else {
-        return 'không tìm thấy môn học';
+        // Nếu không tìm thấy trong Redis, tìm grade trong database
+        const dbData = await this.gradeRepository.findOneBy({ subject: key });
+        if (dbData) {
+          const gradeData = JSON.stringify(dbData);
+          const ttl = 3600;
+          // Đẩy dữ liệu từ database lên Redis
+          await this.redisService.set(`Grade:${key}`, gradeData, ttl);
+          return dbData;
+        } else {
+          return 'không tìm thấy môn học';
+        }
       }
     } catch (error) {
       console.log(error);
@@ -64,45 +101,54 @@ export class GradesService {
       if (!existingGrade) {
         return `Không tìm thấy môn học ${subject}`;
       } else {
-        const updatedUser = { ...JSON.parse(existingGrade), ...updateGradeDto };
+        const parsedGrade = JSON.parse(existingGrade);
+        const updatedGrade = { ...parsedGrade, ...updateGradeDto };
 
         // Kiểm tra nếu tên mới trùng với tên môn học khác
         if (updateGradeDto.subject && updateGradeDto.subject !== subject) {
-          const newsubjectUser = await this.redisService.get(
+          const newSubjectGrade = await this.redisService.get(
             `Grade:${updateGradeDto.subject}`,
           );
-          if (newsubjectUser) {
+          if (newSubjectGrade) {
             return 'Môn học đã tồn tại';
-          }
-        } else {
-          // Cập nhật thông tin môn học
-          const userData = JSON.stringify(updatedUser);
-          const ttl = 3600;
-
-          // Nếu tên mới khác tên cũ, xóa dữ liệu cũ và thêm dữ liệu mới
-          if (updateGradeDto.subject && updateGradeDto.subject !== subject) {
+          } else {
+            // Nếu tên mới khác tên cũ, xóa dữ liệu cũ và thêm dữ liệu mới trong Redis
             await this.redisService.del(`Grade:${subject}`);
             await this.redisService.set(
               `Grade:${updateGradeDto.subject}`,
-              userData,
-              ttl,
+              JSON.stringify(updatedGrade),
+              3600,
             );
-          } else {
-            await this.redisService.set(`Grade:${subject}`, userData, ttl);
           }
-          return `Đã cập nhật môn học ${subject}`;
+        } else {
+          // Cập nhật thông tin môn học trong Redis với tên hiện tại
+          await this.redisService.set(
+            `Grade:${subject}`,
+            JSON.stringify(updatedGrade),
+            3600,
+          );
         }
+
+        // Cập nhật thông tin môn học trong database
+        await this.gradeRepository.update(parsedGrade.id, updateGradeDto);
+
+        return `Đã cập nhật môn học ${subject}`;
       }
     } catch (error) {
       console.log(error);
+      return 'Có lỗi xảy ra khi cập nhật môn học';
     }
   }
 
   async remove(key: string) {
     try {
       const data = await this.redisService.get(`Grade:${key}`);
+      const parsedGrade = JSON.parse(data);
+
       if (data) {
-        await this.redisService.del(`Grade:${key}`); // Xóa 1 key
+        await this.redisService.del(`Grade:${key}`); // Xóa 1 key trong Redis
+        await this.gradeRepository.delete(parsedGrade); // Xóa từ database
+
         return `Đã xóa môn học ${key}`;
       } else {
         return `Không tìm thấy môn học ${key}`;
@@ -114,14 +160,16 @@ export class GradesService {
 
   async removeAll() {
     try {
-      const keys = await this.redisService.getAllKeys('Grade*'); // Lấy danh sách tất cả keys
+      const keys = await this.redisService.getAllKeys('Grade:*'); // Lấy danh sách tất cả keys
       if (keys.length === 0) {
         return 'Không tìm thấy môn học nào';
       } else {
-        const userKeys = keys.filter((key) => key.startsWith('Grade:')); // Lọc ra các keys trong thư mục user
-        for (const key of userKeys) {
-          await this.redisService.del(key); // Xóa key
+        const gradeKeys = keys.filter((key) => key.startsWith('Grade:')); // Lọc ra các keys trong thư mục Grade
+        for (const key of gradeKeys) {
+          await this.redisService.del(key); // Xóa key trong Redis
         }
+        // Xóa tất cả các bản ghi môn học trong cơ sở dữ liệu
+        await this.gradeRepository.clear();
         return 'Các keys trong thư mục "Grade" đã được xóa';
       }
     } catch (error) {
