@@ -41,7 +41,20 @@ export class UsersService {
       const users = [];
   
       if (!keys || keys.length === 0) {
-        return 'không tìm thấy user nào';
+        // Không tìm thấy user nào trên Redis, lấy tất cả user từ database
+        const dbUsers = await this.userRepository.find();
+        if (dbUsers.length === 0) {
+          return 'không tìm thấy user nào';
+        }
+  
+        // Đẩy các user từ database lên Redis
+        for (const dbUser of dbUsers) {
+          const redisKey = `User:${dbUser.name}`;
+          await this.redisService.set(redisKey, JSON.stringify(dbUser), 3600);
+          users.push(dbUser);
+        }
+  
+        return users;
       } else {
         for (const key of keys) {
           const userData = await this.redisService.get(key);

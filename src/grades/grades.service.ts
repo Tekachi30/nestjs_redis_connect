@@ -39,32 +39,44 @@ export class GradesService {
 
   async findAll() {
     try {
-      const datas = await this.redisService.getAllKeys('Grade*');
+      const keys = await this.redisService.getAllKeys('Grade:*');
       const grades = [];
-      if (!datas || datas.length === 0) {
-        return 'không tìm thấy môn học nào';
+  
+      if (!keys || keys.length === 0) {
+        // Không tìm thấy môn học nào trên Redis, lấy tất cả môn học từ database
+        const dbGrades = await this.gradeRepository.find();
+        if (dbGrades.length === 0) {
+          return 'không tìm thấy môn học nào';
+        }
+  
+        // Đẩy các môn học từ database lên Redis
+        for (const dbGrade of dbGrades) {
+          const redisKey = `Grade:${dbGrade.subject}`;
+          await this.redisService.set(redisKey, JSON.stringify(dbGrade), 3600);
+          grades.push(dbGrade);
+        }
+  
+        return grades;
       } else {
-        for (const data of datas) {
-          const gradeData = await this.redisService.get(data);
+        for (const key of keys) {
+          const gradeData = await this.redisService.get(key);
           if (gradeData) {
             grades.push(JSON.parse(gradeData));
           }
         }
-        // Kiểm tra trong database để tìm grade không có trong Redis
+  
+        // Kiểm tra trong database để tìm môn học không có trong Redis
         const dbGrades = await this.gradeRepository.find();
         for (const dbGrade of dbGrades) {
-          const gradeInRedis = grades.find((grade) => grade.id === dbGrade.id);
+          const gradeInRedis = grades.find(grade => grade.id === dbGrade.id);
           if (!gradeInRedis) {
-            // Đẩy grade từ database lên Redis
-            const redisKey = dbGrade.subject;
-            await this.redisService.set(
-              `Grade:${redisKey}`,
-              JSON.stringify(dbGrade),
-              3600,
-            );
+            // Đẩy môn học từ database lên Redis
+            const redisKey = `Grade:${dbGrade.subject}`;
+            await this.redisService.set(redisKey, JSON.stringify(dbGrade), 3600);
             grades.push(dbGrade);
           }
         }
+  
         return grades;
       }
     } catch (error) {
