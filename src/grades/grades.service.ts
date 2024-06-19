@@ -41,21 +41,21 @@ export class GradesService {
     try {
       const keys = await this.redisService.getAllKeys('Grade:*');
       const grades = [];
-  
+
       if (!keys || keys.length === 0) {
         // Không tìm thấy môn học nào trên Redis, lấy tất cả môn học từ database
         const dbGrades = await this.gradeRepository.find();
         if (dbGrades.length === 0) {
           return 'không tìm thấy môn học nào';
         }
-  
+
         // Đẩy các môn học từ database lên Redis
         for (const dbGrade of dbGrades) {
           const redisKey = `Grade:${dbGrade.subject}`;
           await this.redisService.set(redisKey, JSON.stringify(dbGrade), 3600);
           grades.push(dbGrade);
         }
-  
+
         return grades;
       } else {
         for (const key of keys) {
@@ -64,19 +64,23 @@ export class GradesService {
             grades.push(JSON.parse(gradeData));
           }
         }
-  
+
         // Kiểm tra trong database để tìm môn học không có trong Redis
         const dbGrades = await this.gradeRepository.find();
         for (const dbGrade of dbGrades) {
-          const gradeInRedis = grades.find(grade => grade.id === dbGrade.id);
+          const gradeInRedis = grades.find((grade) => grade.id === dbGrade.id);
           if (!gradeInRedis) {
             // Đẩy môn học từ database lên Redis
             const redisKey = `Grade:${dbGrade.subject}`;
-            await this.redisService.set(redisKey, JSON.stringify(dbGrade), 3600);
+            await this.redisService.set(
+              redisKey,
+              JSON.stringify(dbGrade),
+              3600,
+            );
             grades.push(dbGrade);
           }
         }
-  
+
         return grades;
       }
     } catch (error) {
@@ -126,19 +130,20 @@ export class GradesService {
           } else {
             // Nếu tên mới khác tên cũ, xóa dữ liệu cũ và thêm dữ liệu mới trong Redis
             await this.redisService.del(`Grade:${subject}`);
-            await this.redisService.set(
-              `Grade:${updateGradeDto.subject}`,
-              JSON.stringify(updatedGrade),
-              3600,
-            );
+            // await this.redisService.set(
+            //   `Grade:${updateGradeDto.subject}`,
+            //   JSON.stringify(updatedGrade),
+            //   3600,
+            // );
           }
         } else {
           // Cập nhật thông tin môn học trong Redis với tên hiện tại
-          await this.redisService.set(
-            `Grade:${subject}`,
-            JSON.stringify(updatedGrade),
-            3600,
-          );
+          await this.redisService.del(`Grade:${subject}`);
+          // await this.redisService.set(
+          //   `Grade:${subject}`,
+          //   JSON.stringify(updatedGrade),
+          //   3600,
+          // );
         }
 
         // Cập nhật thông tin môn học trong database
