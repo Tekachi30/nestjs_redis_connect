@@ -17,7 +17,6 @@ import { Grade } from './grades/entities/grade.entity';
           password: configService.get<string>('MSSQL_PASSWORD', ''),
           database: configService.get<string>('MSSQL_DB_NAME', 'DB_NestRedis'),
           entities: [User,Grade],
-          // autoLoadEntities: true,
           synchronize: false, 
           // migrations: ['dist/migrations/*.js'],
           // cli: {

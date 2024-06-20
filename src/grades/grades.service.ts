@@ -20,7 +20,10 @@ export class GradesService {
       const key = createGradeDto.subject;
       const existingSubject = await this.redisService.get(key);
       if (existingSubject) {
-        return 'Môn học đã tồn tại';
+        return {
+          statusCode: 400,
+          message: 'Môn học đã tồn tại',
+        };
       } else {
         const savedgrade = await this.gradeRepository.save(createGradeDto);
         const subjectData = JSON.stringify({
@@ -29,11 +32,17 @@ export class GradesService {
         });
         const ttl = 3600;
         await this.redisService.set(`Grade:${key}`, subjectData, ttl);
-        return 'thêm thành công';
+        return {
+          statusCode: 201,
+          message: 'thêm thành công',
+        };
       }
     } catch (error) {
       console.log(error);
-      return 'ta đã thấy lỗi fix đê';
+      return {
+        statusCode: 404,
+        message: 'ta đã thấy lỗi fix đê',
+      };
     }
   }
 
@@ -46,7 +55,10 @@ export class GradesService {
         // Không tìm thấy môn học nào trên Redis, lấy tất cả môn học từ database
         const dbGrades = await this.gradeRepository.find();
         if (dbGrades.length === 0) {
-          return 'không tìm thấy môn học nào';
+          return {
+            statusCode: 400,
+            message: 'không tìm thấy môn học nào',
+          };
         }
 
         // Đẩy các môn học từ database lên Redis
@@ -85,6 +97,10 @@ export class GradesService {
       }
     } catch (error) {
       console.log(error);
+      return {
+        statusCode: 404,
+        message: 'ta đã thấy lỗi fix đê',
+      };
     }
   }
 
@@ -103,11 +119,18 @@ export class GradesService {
           await this.redisService.set(`Grade:${key}`, gradeData, ttl);
           return dbData;
         } else {
-          return 'không tìm thấy môn học';
+          return {
+            statusCode: 400,
+            message: 'không tìm thấy môn học',
+          };
         }
       }
     } catch (error) {
       console.log(error);
+      return {
+        statusCode: 404,
+        message: 'ta đã thấy lỗi fix đê',
+      };
     }
   }
 
@@ -115,7 +138,10 @@ export class GradesService {
     try {
       const existingGrade = await this.redisService.get(`Grade:${subject}`);
       if (!existingGrade) {
-        return `Không tìm thấy môn học ${subject}`;
+        return {
+          statusCode: 400,
+          message: `Không tìm thấy môn học ${subject}`,
+        };
       } else {
         const parsedGrade = JSON.parse(existingGrade);
         const updatedGrade = { ...parsedGrade, ...updateGradeDto };
@@ -126,34 +152,33 @@ export class GradesService {
             `Grade:${updateGradeDto.subject}`,
           );
           if (newSubjectGrade) {
-            return 'Môn học đã tồn tại';
+            return {
+              statusCode: 400,
+              message: 'Môn học đã tồn tại',
+            };
           } else {
             // Nếu tên mới khác tên cũ, xóa dữ liệu cũ và thêm dữ liệu mới trong Redis
             await this.redisService.del(`Grade:${subject}`);
-            // await this.redisService.set(
-            //   `Grade:${updateGradeDto.subject}`,
-            //   JSON.stringify(updatedGrade),
-            //   3600,
-            // );
           }
         } else {
           // Cập nhật thông tin môn học trong Redis với tên hiện tại
           await this.redisService.del(`Grade:${subject}`);
-          // await this.redisService.set(
-          //   `Grade:${subject}`,
-          //   JSON.stringify(updatedGrade),
-          //   3600,
-          // );
         }
 
         // Cập nhật thông tin môn học trong database
         await this.gradeRepository.update(parsedGrade.id, updateGradeDto);
 
-        return `Đã cập nhật môn học ${subject}`;
+        return {
+          statusCode: 201,
+          message: `Đã cập nhật môn học ${subject}`,
+        };
       }
     } catch (error) {
       console.log(error);
-      return 'Có lỗi xảy ra khi cập nhật môn học';
+      return {
+        statusCode: 404,
+        message: 'ta đã thấy lỗi fix đê',
+      };
     }
   }
 
@@ -166,12 +191,22 @@ export class GradesService {
         await this.redisService.del(`Grade:${key}`); // Xóa 1 key trong Redis
         await this.gradeRepository.delete(parsedGrade); // Xóa từ database
 
-        return `Đã xóa môn học ${key}`;
+        return {
+          statusCode: 204,
+          message: `Đã xóa môn học ${key}`,
+        };
       } else {
-        return `Không tìm thấy môn học ${key}`;
+        return {
+          statusCode: 400,
+          message: `Không tìm thấy môn học ${key}`,
+        };
       }
     } catch (error) {
       console.log(error);
+      return {
+        statusCode: 404,
+        message: 'ta đã thấy lỗi fix đê',
+      };
     }
   }
 
@@ -179,7 +214,10 @@ export class GradesService {
     try {
       const keys = await this.redisService.getAllKeys('Grade:*'); // Lấy danh sách tất cả keys
       if (keys.length === 0) {
-        return 'Không tìm thấy môn học nào';
+        return {
+          statusCode: 400,
+          message: 'Không tìm thấy môn học nào',
+        };
       } else {
         const gradeKeys = keys.filter((key) => key.startsWith('Grade:')); // Lọc ra các keys trong thư mục Grade
         for (const key of gradeKeys) {
@@ -187,10 +225,17 @@ export class GradesService {
         }
         // Xóa tất cả các bản ghi môn học trong cơ sở dữ liệu
         await this.gradeRepository.clear();
-        return 'Các keys trong thư mục "Grade" đã được xóa';
+        return {
+          statusCode: 204,
+          message: 'Các keys trong thư mục "Grade" đã được xóa',
+        };
       }
     } catch (error) {
       console.log(error);
+      return {
+        statusCode: 404,
+        message: 'ta đã thấy lỗi fix đê',
+      };
     }
   }
 }

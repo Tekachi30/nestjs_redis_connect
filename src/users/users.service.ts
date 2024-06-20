@@ -20,18 +20,27 @@ export class UsersService {
       const key = createUserDto.name;
       const existingUser = await this.redisService.get(key);
       if (existingUser) {
-        return 'Tên người dùng đã tồn tại';
+        return {
+          statusCode: 400, 
+          message: 'Tên người dùng đã tồn tại'
+        };
       } else {
         
         const savedUser = await this.userRepository.save(createUserDto);
         const userData = JSON.stringify({id: savedUser.id, ...createUserDto});
         const ttl = 3600;
         await this.redisService.set(`User:${key}`, userData, ttl);
-        return 'thêm thành công';
+        return {
+          statusCode: 201, 
+          message: 'thêm thành công'
+        };
       }
     } catch (error) {
       console.log(error);
-      return 'ta đã thấy lỗi fix đê';
+      return {
+        statusCode: 404, 
+        message: 'ta đã thấy lỗi fix đê'
+      };
     }
   }
 
@@ -44,7 +53,10 @@ export class UsersService {
         // Không tìm thấy user nào trên Redis, lấy tất cả user từ database
         const dbUsers = await this.userRepository.find();
         if (dbUsers.length === 0) {
-          return 'không tìm thấy user nào';
+          return {
+            statusCode: 400, 
+            message: 'không tìm thấy user nào'
+          };
         }
   
         // Đẩy các user từ database lên Redis
@@ -79,7 +91,10 @@ export class UsersService {
       }
     } catch (error) {
       console.log(error);
-      return 'ta đã thấy lỗi fix đê';
+      return {
+        statusCode: 404, 
+        message: 'ta đã thấy lỗi fix đê'
+      };
     }
   }
 
@@ -99,12 +114,18 @@ export class UsersService {
           await this.redisService.set(`User:${key}`, userData, ttl);
           return dbData;
         } else {
-          return 'Không tìm thấy user';
+          return {
+            statusCode: 400, 
+            message: 'Không tìm thấy user'
+          };
         }
       }
     } catch (error) {
       console.log(error);
-      return 'ta đã thấy lỗi fix đê';
+      return {
+        statusCode: 404, 
+        message: 'ta đã thấy lỗi fix đê'
+      };
     }
   }
 
@@ -112,44 +133,45 @@ export class UsersService {
     try {
       const existingUser = await this.redisService.get(`User:${name}`);
       if (!existingUser) {
-        return `Không tìm thấy user ${name}`;
+        return {
+          statusCode: 400, 
+          message: `Không tìm thấy user ${name}`
+        };
       } else {
         const parsedUser = JSON.parse(existingUser);
-        const modifyUser = { ...parsedUser, ...updateUserDto };
-
         // Kiểm tra nếu tên mới trùng với tên người dùng khác
         if (updateUserDto.name && updateUserDto.name !== name) {
           const newNameUser = await this.redisService.get(
             `User:${updateUserDto.name}`,
           );
           if (newNameUser) {
-            return 'Tên người dùng đã tồn tại';
+            return {
+              statusCode: 400, 
+              message: 'Tên người dùng đã tồn tại'
+            };
           } else {
             // Nếu tên mới khác tên cũ, xóa dữ liệu cũ và thêm dữ liệu mới trong Redis
             await this.redisService.del(`User:${name}`);
-            await this.redisService.set(
-              `User:${updateUserDto.name}`,
-              JSON.stringify(modifyUser),
-              3600,
-            );
           }
         } else {
           // Cập nhật thông tin người dùng trong Redis với tên hiện tại
-          await this.redisService.set(
-            `User:${name}`,
-            JSON.stringify(modifyUser),
-            3600,
-          );
+          await this.redisService.del(`User:${name}`);
         }
 
         // Cập nhật thông tin người dùng trong database
         await this.userRepository.update(parsedUser.id, updateUserDto);
 
-        return `Đã cập nhật user ${name}`;
+        return {
+          statusCode: 201, 
+          message: `Đã cập nhật user ${name}`
+        };
       }
     } catch (error) {
       console.log(error);
-      return 'ta đã thấy lỗi fix đê';
+      return {
+        statusCode: 404, 
+        message: 'ta đã thấy lỗi fix đê'
+      };
     }
   }
 
@@ -160,13 +182,19 @@ export class UsersService {
       if (data) {
         await this.redisService.del(`User:${key}`); // Xóa 1 key
         await this.userRepository.delete(parsedUser);
-        return `Đã xóa user ${key}`;
+        return {
+          statusCode: 204, 
+          message: `Đã xóa user ${key}`
+        };
       } else {
         return `Không tìm thấy user ${key}`;
       }
     } catch (error) {
       console.log(error);
-      return 'ta đã thấy lỗi fix đê';
+      return {
+        statusCode: 404, 
+        message: 'ta đã thấy lỗi fix đê'
+      };
     }
   }
 
@@ -174,7 +202,10 @@ export class UsersService {
     try {
       const keys = await this.redisService.getAllKeys('User:*'); // Lấy danh sách tất cả keys
       if (keys.length === 0) {
-        return 'Không tìm thấy key nào';
+        return {
+          statusCode: 400, 
+          message: 'Không tìm thấy key nào'
+        };
       } else {
         const userKeys = keys.filter((key) => key.startsWith('User:')); // Lọc ra các keys trong thư mục user
         for (const key of userKeys) {
@@ -182,11 +213,17 @@ export class UsersService {
         }
         // Xóa tất cả các bản ghi user trong cơ sở dữ liệu
         await this.userRepository.clear();
-        return 'Các keys trong thư mục "user" đã được xóa';
+        return {
+          statusCode: 204, 
+          message: 'Các keys trong thư mục "user" đã được xóa'
+        };
       }
     } catch (error) {
       console.log(error);
-      return 'ta đã thấy lỗi fix đê';
+      return {
+        statusCode: 404, 
+        message: 'ta đã thấy lỗi fix đê'
+      };
     }
   }
 }

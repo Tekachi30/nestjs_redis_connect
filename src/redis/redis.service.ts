@@ -54,17 +54,4 @@ export class RedisService {
     const keys = await this.client.keys(keyPattern);
     return keys;
   }
-
-  // cách khác tìm toàn bộ: (khuyến khích ?????)
-  // async scanKeys(key: string = '*'): Promise<string[]> {
-  //   const keys: string[] = [];
-  //   let cursor = '0';
-  //   do {
-  //     const reply = await this.client.scan(cursor, 'MATCH', key, 'COUNT', 100);
-  //     console.log(reply);
-  //     cursor = reply[0];
-  //     keys.push(...reply[1]);
-  //   } while (cursor !== '0');
-  //   return keys;
-  // }
 }

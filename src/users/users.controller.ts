@@ -9,10 +9,12 @@ import {
   Delete,
   HttpCode,
   HttpStatus,
+  UsePipes,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { CustomValidationPipe } from 'src/assist/pipe/custom-validation.pipe';
 
 @Controller('users')
 export class UsersController {
@@ -20,6 +22,7 @@ export class UsersController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @UsePipes(CustomValidationPipe)
   create(@Body() createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto);
   }
