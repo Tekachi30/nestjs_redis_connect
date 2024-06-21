@@ -1,7 +1,7 @@
 import { Injectable, ArgumentMetadata, BadRequestException, ValidationPipe, ValidationError } from '@nestjs/common';
 
 @Injectable()
-export class CustomValidationPipe extends ValidationPipe {
+export class CustomValidationPipe extends ValidationPipe { // dùng để xóa [] trong message có sẵn
   constructor() {
     super({
       exceptionFactory: (errors: ValidationError[]) => {

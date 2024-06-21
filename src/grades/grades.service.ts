@@ -18,7 +18,7 @@ export class GradesService {
   async create(createGradeDto: CreateGradeDto) {
     try {
       const key = createGradeDto.subject;
-      const existingSubject = await this.redisService.get(key);
+      const existingSubject = await this.redisService.get(`Grade:${key}`);
       if (existingSubject) {
         return {
           statusCode: 400,

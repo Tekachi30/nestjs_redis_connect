@@ -18,14 +18,14 @@ export class UsersService {
   async create(createUserDto: CreateUserDto) {
     try {
       const key = createUserDto.name;
-      const existingUser = await this.redisService.get(key);
+      const existingUser = await this.redisService.get(`User:${key}`);
       if (existingUser) {
         return {
           statusCode: 400, 
           message: 'Tên người dùng đã tồn tại'
         };
       } else {
-        
+        // thêm vào SQL Sever và Redis
         const savedUser = await this.userRepository.save(createUserDto);
         const userData = JSON.stringify({id: savedUser.id, ...createUserDto});
         const ttl = 3600;
