@@ -1,5 +1,4 @@
-import { User } from "src/users/entities/user.entity"
-import { Entity, Column, PrimaryGeneratedColumn, OneToMany } from "typeorm"
+import { Entity, Column, PrimaryGeneratedColumn, PrimaryColumn, BeforeInsert } from "typeorm"
 
 @Entity({ name: 'grades' })
 export class Grade {
