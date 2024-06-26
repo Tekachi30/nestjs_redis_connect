@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { User } from './users/entities/user.entity'
 import { Grade } from './grades/entities/grade.entity';
+import { Post } from './posts/entities/post.entity';
 
 @Module({
   imports: [
@@ -16,7 +17,8 @@ import { Grade } from './grades/entities/grade.entity';
           username: configService.get<string>('MSSQL_USER', 'root'),
           password: configService.get<string>('MSSQL_PASSWORD', ''),
           database: configService.get<string>('MSSQL_DB_NAME', 'DB_NestRedis'),
-          entities: [User,Grade],
+          // entities: [User,Grade,Post],
+          autoLoadEntities: true,
           synchronize: false, 
           // migrations: ['dist/migrations/*.js'],
           // cli: {

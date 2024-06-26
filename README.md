@@ -3,6 +3,7 @@
 ## Lệnh tạo model:
 - nest g resource ???
 
+### Tạm thời dưới đây chưa đúng:
 ## Migrations SQL Server
 1. npm i mssql typeorm 
 2. npm i --save-dev ts-node tsconfig-paths
@@ -16,4 +17,5 @@
     "migration:generate": "npm run build && npm run typeorm -- migration:generate -n",
     "migration:run": "npm run build && npm run typeorm -- migration:run"
 ```
-7. 
+7. chạy: npm run migration:run
+- nguồn kết nối: https://dev.to/amirfakour/using-typeorm-migration-in-nestjs-with-postgres-database-3c75 

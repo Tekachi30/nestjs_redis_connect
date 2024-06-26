@@ -1,13 +1,14 @@
-import { Entity, Column, PrimaryGeneratedColumn, PrimaryColumn, BeforeInsert } from "typeorm"
+// grade.entity.ts
+import { Entity, Column, PrimaryGeneratedColumn} from "typeorm"
 
 @Entity({ name: 'grades' })
 export class Grade {
     @PrimaryGeneratedColumn()
-    id: number;
+    id: string;
 
     @Column({ nullable: false })
     subject: string
 
-    @Column({ nullable: false })
+    @Column({ nullable: true })
     quantity: number
 }

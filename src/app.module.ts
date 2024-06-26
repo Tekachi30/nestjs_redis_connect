@@ -8,6 +8,7 @@ import { ConfigModule } from '@nestjs/config';
 import { UsersModule } from './users/users.module';
 import { GradesModule } from './grades/grades.module';
 import { CustomTypeOrmModule } from './typeorm.config';
+import { PostsModule } from './posts/posts.module';
 
 
 @Module({
@@ -17,8 +18,10 @@ import { CustomTypeOrmModule } from './typeorm.config';
   }),
   CustomTypeOrmModule,
   RedisModule,
+  PostsModule,
   UsersModule,
-  GradesModule,],
+  GradesModule,
+  PostsModule,],
   controllers: [AppController],
   providers: [AppService],
 })
