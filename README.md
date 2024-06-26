@@ -28,7 +28,9 @@ npm i nodemon
 }
 ```
 3. Thay đổi trong file scripts:
-- "start": "nodemon"
+```
+"start": "nodemon"
+```
 4. Chạy lệnh: 
 ```
 npm start
