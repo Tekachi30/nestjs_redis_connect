@@ -1,15 +1,19 @@
 //users.service.ts
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, forwardRef } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { RedisService } from '../redis/redis.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
 import { Repository } from 'typeorm';
+import { PostsService } from 'src/posts/posts.service';
 @Injectable()
 export class UsersService {
   constructor(
     private readonly redisService: RedisService,
+
+    @Inject(forwardRef(() => PostsService))
+    private readonly postsService: PostsService,
 
     @InjectRepository(User)
     private userRepository: Repository<User>,
@@ -178,8 +182,11 @@ export class UsersService {
   async remove(key: string) {
     try {
       const data = await this.redisService.get(`User:${key}`);
-      const parsedUser = JSON.parse(data);
+      const parsedUser = JSON.parse(data) as User;
       if (data) {
+        // xóa các post liên quan với user bị xóa
+        await this.postsService.deletePostsByUser(parsedUser);
+
         await this.redisService.del(`User:${key}`); // Xóa 1 key
         await this.userRepository.delete(parsedUser);
         return {
@@ -209,10 +216,17 @@ export class UsersService {
       } else {
         const userKeys = keys.filter((key) => key.startsWith('User:')); // Lọc ra các keys trong thư mục user
         for (const key of userKeys) {
-          await this.redisService.del(key); // Xóa key trong redis
+          const data = await this.redisService.get(key);
+          const parsedUser = JSON.parse(data) as User;
+          if (data) {
+            // Xóa các bài viết liên quan đến người dùng
+            await this.postsService.deletePostsByUser(parsedUser);
+            // Xóa key người dùng trong Redis
+            await this.redisService.del(key);
+            // Xóa người dùng trong cơ sở dữ liệu
+            await this.userRepository.delete(parsedUser);
+          }
         }
-        // Xóa tất cả các bản ghi user trong cơ sở dữ liệu
-        await this.userRepository.clear();
         return {
           statusCode: 204,
           message: 'Các keys trong thư mục "user" đã được xóa',

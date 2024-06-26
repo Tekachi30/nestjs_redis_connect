@@ -6,12 +6,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Post } from './entities/post.entity';
 import { UsersService } from 'src/users/users.service';
+import { User } from 'src/users/entities/user.entity';
 
 @Injectable()
 export class PostsService {
   constructor(
     private readonly redisService: RedisService,
 
+    @Inject(forwardRef(() => UsersService))
     private readonly usersService: UsersService,
 
     @InjectRepository(Post)
@@ -205,10 +207,15 @@ export class PostsService {
     }
   }
 
-  /*
-  Xóa 
-  */
-  // removeAll(id: number) {
-  //   return `This action removes a #${id} post`;
-  // }
+  async deletePostsByUser(user: User) {
+    try {
+      const posts = await this.postRepository.find({ where: { user: user } });
+      for (const post of posts) {
+        await this.redisService.del(`Post:${post.title}`); // Xóa key trong Redis
+        await this.postRepository.delete(post); // Xóa bài viết trong cơ sở dữ liệu
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  }
 }

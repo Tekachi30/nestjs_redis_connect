@@ -9,7 +9,7 @@ import { PostsModule } from 'src/posts/posts.module';
 @Module({
   imports: [
     TypeOrmModule.forFeature([User]),
-    // forwardRef(() => PostsModule),
+    forwardRef(() => PostsModule),
     RedisModule
     ],
   controllers: [UsersController],
