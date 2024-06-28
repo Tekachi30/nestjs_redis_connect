@@ -37,10 +37,12 @@ npm start
 ```
 
 ## Cấu hình nestjs SQL Server
-1. npm i mssql typeorm 
-2. npm i --save-dev ts-node tsconfig-paths
-3. Tạo file typeorm.config.ts và cấu hình (Mẫu: https://github.com/Tekachi30/nestjs_redis_connect/blob/master/src/typeorm.config.ts)
-4. Set up các entity trong các model
+1. cài SQL Server typeorm
+```
+npm i mssql typeorm 
+```
+2. Tạo file typeorm.config.ts và cấu hình (Mẫu: https://github.com/Tekachi30/nestjs_redis_connect/blob/master/src/typeorm.config.ts)
+3. Set up các entity trong các model
 - Mẫu:
 ```
 // .src/users/entities/user.entity.ts
@@ -65,11 +67,11 @@ export class User {
     posts: Post[];
 }
 ```
-5. Trong file typeorm.config.ts 
+4. Trong file typeorm.config.ts 
 ```
 synchronize: false // chỉ chạy 1 lần khi để true 
 ```
-6. chạy lệnh:
+5. chạy lệnh:
 ```
 npm start
 ```
