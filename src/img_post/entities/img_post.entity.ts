@@ -1,3 +1,4 @@
+// img_post.entity.ts
 import { Post } from 'src/posts/entities/post.entity';
 import {
   Column,

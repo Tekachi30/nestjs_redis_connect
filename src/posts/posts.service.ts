@@ -8,6 +8,7 @@ import { Post } from './entities/post.entity';
 import { UsersService } from 'src/users/users.service';
 import { User } from 'src/users/entities/user.entity';
 import { ImgPostService } from 'src/img_post/img_post.service';
+import { v2 as cloudinary } from 'cloudinary';
 
 @Injectable()
 export class PostsService {
@@ -153,6 +154,10 @@ export class PostsService {
     return check_user;
   }
 
+  async findAllByUser(user: User) {
+    return this.postRepository.find({ where: { user: user } });
+  }
+
   async update(key: string, updatePostDto: UpdatePostDto) {
     try {
       const existingPost = await this.redisService.get(`Post:${key}`);
@@ -228,9 +233,19 @@ export class PostsService {
     try {
       const posts = await this.postRepository.find({ where: { user: user } });
       for (const post of posts) {
-        await this.img_postService.deletePostsByPost(post); // xóa tất cả ảnh của post
-        await this.redisService.del(`Post:${post.title}`); // Xóa key trong Redis
-        await this.postRepository.delete(post); // Xóa bài viết trong cơ sở dữ liệu
+      const img_posts = await this.img_postService.findAllImgByPost(post);
+      if(img_posts){
+        for (const img_post of img_posts) {
+          cloudinary.api
+          .delete_resources([img_post.img_public_key],
+            { type: 'upload', resource_type: 'image' })
+          .then(console.log); // xóa trên cloud
+          await this.redisService.del(`Img_post:${img_post.img_url}`); // Xóa key trong Redis
+          await this.img_postService.deleteImgPost(img_post.id); // Xóa bài viết trong cơ sở dữ liệu
+        }
+      }
+      await this.redisService.del(`Post:${post.title}`); // Xóa key trong Redis
+      await this.postRepository.delete(post); // Xóa bài viết trong cơ sở dữ liệu
       }
     } catch (error) {
       console.log(error);

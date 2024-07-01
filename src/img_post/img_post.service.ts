@@ -66,8 +66,59 @@ export class ImgPostService {
     }
   }
 
-  findAll() {
-    return `This action returns all imgPost`;
+  async findAll() {
+    try {
+      const keys = await this.redisService.getAllKeys('Img_post:*');
+      const posts = [];
+      if (!keys || keys.length === 0) {
+        // Không tìm thấy post nào trên Redis, lấy tất cả post từ database
+        const dbImgPosts = await this.img_postRepository.find({ relations: ['post'] });
+        if (dbImgPosts.length === 0) {
+          return {
+            statusCode: 400,
+            message: 'không tìm thấy ảnh nào',
+          };
+        }
+        // Đẩy các post từ database lên Redis
+        for (const dbImgPost of dbImgPosts) {
+          const redisKey = `Img_post:${dbImgPost.img_url}`;
+          await this.redisService.set(redisKey, JSON.stringify(dbImgPost), 3600);
+          posts.push(dbImgPost);
+        }
+
+        return posts;
+      } else {
+        for (const key of keys) {
+          const postData = await this.redisService.get(key);
+          if (postData) {
+            posts.push(JSON.parse(postData));
+          }
+        }
+        // Kiểm tra trong database để tìm post không có trong Redis
+        const dbImgPosts = await this.img_postRepository.find({ relations: ['post'] });
+        for (const dbImgPost of dbImgPosts) {
+          const postInRedis = posts.find((post) => post.id === dbImgPost.id);
+          if (!postInRedis) {
+            // Đẩy post từ database lên Redis
+            const redisKey = `Img_post:${dbImgPost.img_url}`;
+            await this.redisService.set(redisKey, JSON.stringify(dbImgPost), 3600);
+            posts.push(dbImgPost);
+          }
+        }
+        return posts;
+      }
+    } catch (error) {
+      console.log(error);
+      return {
+        statusCode: error.statusCode,
+        message: 'ta đã thấy lỗi fix đê',
+      };
+    }
+  }
+
+  async findAllImgByPost(post: Post){
+    const result = await this.img_postRepository.find({where: {post: post}})
+    return result;
   }
 
   findOne(id: number) {
@@ -98,5 +149,10 @@ export class ImgPostService {
     } catch (error) {
       console.log(error);
     }
+  }
+
+  async deleteImgPost(id: number){
+    const result = await this.img_postRepository.findOne({where: {id: id}})
+    await this.img_postRepository.remove(result);
   }
 }
