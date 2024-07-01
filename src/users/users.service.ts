@@ -7,6 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { User } from './entities/user.entity';
 import { Repository } from 'typeorm';
 import { PostsService } from 'src/posts/posts.service';
+import { ImgPostService } from 'src/img_post/img_post.service';
 @Injectable()
 export class UsersService {
   constructor(
@@ -14,6 +15,9 @@ export class UsersService {
 
     @Inject(forwardRef(() => PostsService))
     private readonly postsService: PostsService,
+
+    @Inject(forwardRef(() => ImgPostService))
+    private readonly img_postService: ImgPostService,
 
     @InjectRepository(User)
     private userRepository: Repository<User>,
@@ -23,7 +27,8 @@ export class UsersService {
     try {
       const key = createUserDto.name;
       const existingUser = await this.redisService.get(`User:${key}`);
-      if (existingUser) {
+      const existingUserDB = await this.userRepository.findOne({where: {name: key}})
+      if (existingUser || existingUserDB) {
         return {
           statusCode: 400,
           message: 'Tên người dùng đã tồn tại',
@@ -54,7 +59,7 @@ export class UsersService {
       const users = [];
       if (!keys || keys.length === 0) {
         // Không tìm thấy user nào trên Redis, lấy tất cả user từ database
-        const dbUsers = await this.userRepository.find();
+        const dbUsers = await this.userRepository.find({ relations: ['posts'] });
         if (dbUsers.length === 0) {
           return {
             statusCode: 400,
@@ -77,7 +82,7 @@ export class UsersService {
           }
         }
         // Kiểm tra trong database để tìm user không có trong Redis
-        const dbUsers = await this.userRepository.find();
+        const dbUsers = await this.userRepository.find({ relations: ['posts'] });
         for (const dbUser of dbUsers) {
           const userInRedis = users.find((user) => user.id === dbUser.id);
           if (!userInRedis) {
@@ -111,7 +116,7 @@ export class UsersService {
         return JSON.parse(data);
       } else {
         // Nếu không tìm thấy trong Redis, tìm user trong database
-        const dbData = await this.userRepository.findOneBy({ name: key });
+        const dbData = await this.userRepository.findOne({where: {name: key}, relations: ['post'], });
         if (dbData) {
           const userData = JSON.stringify(dbData);
           const ttl = 3600;
@@ -137,7 +142,8 @@ export class UsersService {
   async update(name: string, updateUserDto: UpdateUserDto) {
     try {
       const existingUser = await this.redisService.get(`User:${name}`);
-      if (!existingUser) {
+      const existingUserDB = await this.userRepository.findOne({where: {name: updateUserDto.name}})
+      if (!existingUser || existingUserDB) {
         return {
           statusCode: 400,
           message: `Không tìm thấy user ${name}`,
@@ -218,6 +224,7 @@ export class UsersService {
         for (const key of userKeys) {
           const data = await this.redisService.get(key);
           const parsedUser = JSON.parse(data) as User;
+          
           if (data) {
             // Xóa các bài viết liên quan đến người dùng
             await this.postsService.deletePostsByUser(parsedUser);

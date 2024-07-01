@@ -19,7 +19,10 @@ export class GradesService {
     try {
       const key = createGradeDto.subject;
       const existingSubject = await this.redisService.get(`Grade:${key}`);
-      if (existingSubject) {
+      const existingSubjectDB = await this.gradeRepository.findOne({
+        where: { subject: key },
+      });
+      if (existingSubject || existingSubjectDB) {
         return {
           statusCode: 400,
           message: 'Môn học đã tồn tại',
@@ -151,7 +154,10 @@ export class GradesService {
           const newSubjectGrade = await this.redisService.get(
             `Grade:${updateGradeDto.subject}`,
           );
-          if (newSubjectGrade) {
+          const existingSubjectDB = await this.gradeRepository.findOne({
+            where: { subject: updateGradeDto.subject },
+          });
+          if (newSubjectGrade || existingSubjectDB) {
             return {
               statusCode: 400,
               message: 'Môn học đã tồn tại',

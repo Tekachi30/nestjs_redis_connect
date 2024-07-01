@@ -1,26 +1,23 @@
-// post.entity.ts
-import { ImgPost } from 'src/img_post/entities/img_post.entity';
-import { User } from 'src/users/entities/user.entity';
+import { Post } from 'src/posts/entities/post.entity';
 import {
   Column,
   CreateDateColumn,
   Entity,
   ManyToOne,
-  OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 
-@Entity({ name: 'posts' })
-export class Post {
+@Entity({ name: 'img_posts' })
+export class ImgPost {
   @PrimaryGeneratedColumn('uuid')
   id: number;
 
   @Column({ nullable: false })
-  title: string;
+  img_url: string;
 
-  @Column({ nullable: true })
-  content: string;
+  @Column({ nullable: false })
+  img_public_key: string;
 
   @CreateDateColumn({
     type: 'datetime',
@@ -36,9 +33,6 @@ export class Post {
   updated_at: Date;
 
   // Các ràng buộc:
-  @ManyToOne(() => User, (user) => user.posts)
-  user: User;
-
-  @OneToMany(() => ImgPost, (img_post) => img_post.post)
-  img_posts: ImgPost[];
+  @ManyToOne(() => Post, (post) => post.img_posts)
+  post: Post;
 }

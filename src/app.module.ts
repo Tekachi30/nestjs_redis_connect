@@ -9,6 +9,7 @@ import { UsersModule } from './users/users.module';
 import { GradesModule } from './grades/grades.module';
 import { CustomTypeOrmModule } from './typeorm.config';
 import { PostsModule } from './posts/posts.module';
+import { ImgPostModule } from './img_post/img_post.module';
 
 
 @Module({
@@ -21,7 +22,8 @@ import { PostsModule } from './posts/posts.module';
   PostsModule,
   UsersModule,
   GradesModule,
-  PostsModule,],
+  PostsModule,
+  ImgPostModule,],
   controllers: [AppController],
   providers: [AppService],
 })

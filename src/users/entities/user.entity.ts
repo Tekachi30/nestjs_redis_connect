@@ -1,21 +1,41 @@
 // user.entity.ts
-import { Post } from "src/posts/entities/post.entity";
-import { Entity, Column, PrimaryGeneratedColumn, OneToMany} from "typeorm"
+import { Post } from 'src/posts/entities/post.entity';
+import {
+  Entity,
+  Column,
+  PrimaryGeneratedColumn,
+  OneToMany,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity({ name: 'users' })
 export class User {
-    @PrimaryGeneratedColumn("uuid")
-    id: number;
+  @PrimaryGeneratedColumn('uuid')
+  id: number;
 
-    @Column({ nullable: false })
-    name: string;
+  @Column({ nullable: false })
+  name: string;
 
-    @Column({ nullable: true })
-    age: number;
+  @Column({ nullable: true })
+  age: number;
 
-    @Column({ nullable: true })
-    info: string
+  @Column({ nullable: true })
+  info: string;
 
-    @OneToMany(() => Post, post => post.user)
-    posts: Post[];
+  @CreateDateColumn({
+    type: 'datetime',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
+  created_at: Date;
+
+  @UpdateDateColumn({
+    type: 'datetime',
+    default: () => 'CURRENT_TIMESTAMP',
+    onUpdate: 'CURRENT_TIMESTAMP',
+  })
+  updated_at: Date;
+
+  @OneToMany(() => Post, (post) => post.user)
+  posts: Post[];
 }
