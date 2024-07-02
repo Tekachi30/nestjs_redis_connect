@@ -12,7 +12,6 @@ import { PostsService } from 'src/posts/posts.service';
 import { Repository } from 'typeorm';
 import { Post } from 'src/posts/entities/post.entity';
 
-
 @Injectable()
 export class ImgPostService {
   constructor(
@@ -38,24 +37,35 @@ export class ImgPostService {
     });
   }
 
-  async create(createImgPostDto: CreateImgPostDto, file: Express.Multer.File, id: number) {
+  async create(
+    createImgPostDto: CreateImgPostDto,
+    file: Express.Multer.File,
+    id: string,
+  ) {
     try {
-      const add_img = await this.uploadFile(file)
+      const add_img = await this.uploadFile(file);
       const post = await this.postsService.findOneByID(id);
-      if(post){
-        createImgPostDto.img_public_key = add_img.public_id
-        createImgPostDto.img_url = add_img.url
-        createImgPostDto.post = post
-        const result = this.img_postRepository.create(createImgPostDto)
-        const savedImgPost = await this.img_postRepository.save(result)
-        const postData = JSON.stringify({ id: savedImgPost.id, ...createImgPostDto });
+      if (post) {
+        createImgPostDto.img_public_key = add_img.public_id;
+        createImgPostDto.img_url = add_img.url;
+        createImgPostDto.post = post;
+        const result = this.img_postRepository.create(createImgPostDto);
+        const savedImgPost = await this.img_postRepository.save(result);
+        const postData = JSON.stringify({
+          id: savedImgPost.id,
+          ...createImgPostDto,
+        });
         const ttl = 3600;
-        await this.redisService.set(`Img_post:${createImgPostDto.img_url}`, postData, ttl);
+        await this.redisService.set(
+          `Img_post:${createImgPostDto.img_public_key}`,
+          postData,
+          ttl,
+        );
         return {
           statusCode: 201,
           message: 'Thêm ảnh thành công',
         };
-      }else{
+      } else {
         return {
           statusCode: 400,
           message: 'Không tìm thấy post',
@@ -72,7 +82,9 @@ export class ImgPostService {
       const posts = [];
       if (!keys || keys.length === 0) {
         // Không tìm thấy post nào trên Redis, lấy tất cả post từ database
-        const dbImgPosts = await this.img_postRepository.find({ relations: ['post'] });
+        const dbImgPosts = await this.img_postRepository.find({
+          relations: ['post'],
+        });
         if (dbImgPosts.length === 0) {
           return {
             statusCode: 400,
@@ -81,8 +93,12 @@ export class ImgPostService {
         }
         // Đẩy các post từ database lên Redis
         for (const dbImgPost of dbImgPosts) {
-          const redisKey = `Img_post:${dbImgPost.img_url}`;
-          await this.redisService.set(redisKey, JSON.stringify(dbImgPost), 3600);
+          const redisKey = `Img_post:${dbImgPost.img_public_key}`;
+          await this.redisService.set(
+            redisKey,
+            JSON.stringify(dbImgPost),
+            3600,
+          );
           posts.push(dbImgPost);
         }
 
@@ -95,13 +111,19 @@ export class ImgPostService {
           }
         }
         // Kiểm tra trong database để tìm post không có trong Redis
-        const dbImgPosts = await this.img_postRepository.find({ relations: ['post'] });
+        const dbImgPosts = await this.img_postRepository.find({
+          relations: ['post'],
+        });
         for (const dbImgPost of dbImgPosts) {
           const postInRedis = posts.find((post) => post.id === dbImgPost.id);
           if (!postInRedis) {
             // Đẩy post từ database lên Redis
-            const redisKey = `Img_post:${dbImgPost.img_url}`;
-            await this.redisService.set(redisKey, JSON.stringify(dbImgPost), 3600);
+            const redisKey = `Img_post:${dbImgPost.img_public_key}`;
+            await this.redisService.set(
+              redisKey,
+              JSON.stringify(dbImgPost),
+              3600,
+            );
             posts.push(dbImgPost);
           }
         }
@@ -116,8 +138,11 @@ export class ImgPostService {
     }
   }
 
-  async findAllImgByPost(post: Post){
-    const result = await this.img_postRepository.find({where: {post: post}})
+  async findAllImgByPost(id: string) {
+    const result = await this.img_postRepository.find({
+      relations: ['post'],
+      where: { post: { id: id } },
+    });
     return result;
   }
 
@@ -129,30 +154,28 @@ export class ImgPostService {
     return `This action updates a #${id} imgPost`;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} imgPost`;
-  }
-
-  async deletePostsByPost(post: Post) {
+  async remove(key: string) {
     try {
-      const img_posts = await this.img_postRepository.find({ where: { post: post } });
-      if(img_posts){
-        for (const img_post of img_posts) {
-          cloudinary.api
-          .delete_resources([img_post.img_public_key],
-            { type: 'upload', resource_type: 'image' })
+      const data = await this.redisService.get(`Img_post:${key}`);
+      const parsedImgPost = JSON.parse(data);
+      if (data) {
+        cloudinary.api
+          .delete_resources([parsedImgPost.img_public_key], {
+            type: 'upload',
+            resource_type: 'image',
+          })
           .then(console.log); // xóa trên cloud
-          await this.redisService.del(`Img_post:${img_post.img_url}`); // Xóa key trong Redis
-          await this.img_postRepository.delete(post); // Xóa bài viết trong cơ sở dữ liệu
-        }
+        await this.redisService.del(`Img_post:${key}`); // Xóa 1 key
+        await this.img_postRepository.delete(parsedImgPost.id);
+        return {
+          statusCode: 204,
+          message: `Đã xóa post ${key}`,
+        };
+      } else {
+        return `Không tìm thấy post ${key}`;
       }
     } catch (error) {
       console.log(error);
     }
-  }
-
-  async deleteImgPost(id: number){
-    const result = await this.img_postRepository.findOne({where: {id: id}})
-    await this.img_postRepository.remove(result);
   }
 }

@@ -23,7 +23,7 @@ export class PostsService {
     @InjectRepository(Post)
     private postRepository: Repository<Post>,
   ) {}
-  async create(createPostDto: CreatePostDto, id: number) {
+  async create(createPostDto: CreatePostDto, id: string) {
     try {
       const key = createPostDto.title;
       // Kiểm tra tiêu đề đã tồn tại trong Redis chưa
@@ -149,13 +149,17 @@ export class PostsService {
     }
   }
 
-  async findOneByID(id: number) {
+  async findOneByID(id: string) {
     const check_user = await this.postRepository.findOneBy({ id: id });
     return check_user;
   }
 
-  async findAllByUser(user: User) {
-    return this.postRepository.find({ where: { user: user } });
+  async findAllByUser(id: string) {
+    const result = await this.postRepository.find({
+      relations: ['user'],
+      where: { user: { id: id } },
+    });
+    return result;
   }
 
   async update(key: string, updatePostDto: UpdatePostDto) {
@@ -209,12 +213,21 @@ export class PostsService {
   async remove(key: string) {
     try {
       const data = await this.redisService.get(`Post:${key}`);
-      const parsedPost = JSON.parse(data);
+      const parsedPost = JSON.parse(data) as Post;
       if (data) {
+        const check_imgs = await this.img_postService.findAllImgByPost(
+          parsedPost.id,
+        );
+        if (check_imgs.length > 0) {
+          for (const img of check_imgs) {
+            await this.img_postService.remove(img.img_public_key);
+          }
+        }
+
         await this.redisService.del(`Post:${key}`); // Xóa 1 key
-        await this.postRepository.delete(parsedPost);
+        await this.postRepository.remove(parsedPost);
         return {
-          statusCode: 204,
+          statusCode: 200,
           message: `Đã xóa post ${key}`,
         };
       } else {
@@ -226,29 +239,6 @@ export class PostsService {
         statusCode: 404,
         message: 'ta đã thấy lỗi fix đê',
       };
-    }
-  }
-
-  async deletePostsByUser(user: User) {
-    try {
-      const posts = await this.postRepository.find({ where: { user: user } });
-      for (const post of posts) {
-      const img_posts = await this.img_postService.findAllImgByPost(post);
-      if(img_posts){
-        for (const img_post of img_posts) {
-          cloudinary.api
-          .delete_resources([img_post.img_public_key],
-            { type: 'upload', resource_type: 'image' })
-          .then(console.log); // xóa trên cloud
-          await this.redisService.del(`Img_post:${img_post.img_url}`); // Xóa key trong Redis
-          await this.img_postService.deleteImgPost(img_post.id); // Xóa bài viết trong cơ sở dữ liệu
-        }
-      }
-      await this.redisService.del(`Post:${post.title}`); // Xóa key trong Redis
-      await this.postRepository.delete(post); // Xóa bài viết trong cơ sở dữ liệu
-      }
-    } catch (error) {
-      console.log(error);
     }
   }
 }

@@ -8,6 +8,7 @@ import { User } from './entities/user.entity';
 import { Repository } from 'typeorm';
 import { PostsService } from 'src/posts/posts.service';
 import { ImgPostService } from 'src/img_post/img_post.service';
+import { v2 as cloudinary } from 'cloudinary';
 @Injectable()
 export class UsersService {
   constructor(
@@ -27,7 +28,9 @@ export class UsersService {
     try {
       const key = createUserDto.name;
       const existingUser = await this.redisService.get(`User:${key}`);
-      const existingUserDB = await this.userRepository.findOne({where: {name: key}})
+      const existingUserDB = await this.userRepository.findOne({
+        where: { name: key },
+      });
       if (existingUser || existingUserDB) {
         return {
           statusCode: 400,
@@ -55,45 +58,40 @@ export class UsersService {
 
   async findAll() {
     try {
+      // Lấy tất cả các key liên quan đến User từ Redis
       const keys = await this.redisService.getAllKeys('User:*');
       const users = [];
-      if (!keys || keys.length === 0) {
-        // Không tìm thấy user nào trên Redis, lấy tất cả user từ database
-        const dbUsers = await this.userRepository.find({ relations: ['posts'] });
-        if (dbUsers.length === 0) {
-          return {
-            statusCode: 400,
-            message: 'không tìm thấy user nào',
-          };
-        }
-        // Đẩy các user từ database lên Redis
-        for (const dbUser of dbUsers) {
-          const redisKey = `User:${dbUser.name}`;
-          await this.redisService.set(redisKey, JSON.stringify(dbUser), 3600);
-          users.push(dbUser);
-        }
 
-        return users;
-      } else {
+      // Lấy dữ liệu từ Redis cho các key này
+      if (keys && keys.length > 0) {
         for (const key of keys) {
           const userData = await this.redisService.get(key);
           if (userData) {
             users.push(JSON.parse(userData));
           }
         }
-        // Kiểm tra trong database để tìm user không có trong Redis
-        const dbUsers = await this.userRepository.find({ relations: ['posts'] });
-        for (const dbUser of dbUsers) {
-          const userInRedis = users.find((user) => user.id === dbUser.id);
-          if (!userInRedis) {
-            // Đẩy user từ database lên Redis
-            const redisKey = `User:${dbUser.name}`;
-            await this.redisService.set(redisKey, JSON.stringify(dbUser), 3600);
-            users.push(dbUser);
-          }
-        }
-        return users;
       }
+
+      // Lấy tất cả người dùng từ database
+      const dbUsers = await this.userRepository.find({ relations: ['posts'] });
+      if (dbUsers.length === 0) {
+        return {
+          statusCode: 400,
+          message: 'không tìm thấy user nào',
+        };
+      }
+
+      // Đẩy các user từ database lên Redis nếu chưa có trong Redis
+      for (const dbUser of dbUsers) {
+        const userInRedis = users.find((user) => user.id === dbUser.id);
+        if (!userInRedis) {
+          const db = JSON.stringify(dbUser);
+          await this.redisService.set(`User:${dbUser.name}`, db, 3600);
+          users.push(dbUser);
+        }
+      }
+
+      return users;
     } catch (error) {
       console.log(error);
       return {
@@ -103,7 +101,7 @@ export class UsersService {
     }
   }
 
-  async findOneByID(id: number) {
+  async findOneByID(id: string) {
     const check_user = await this.userRepository.findOneBy({ id: id });
     return check_user;
   }
@@ -116,7 +114,10 @@ export class UsersService {
         return JSON.parse(data);
       } else {
         // Nếu không tìm thấy trong Redis, tìm user trong database
-        const dbData = await this.userRepository.findOne({where: {name: key}, relations: ['post'], });
+        const dbData = await this.userRepository.findOne({
+          where: { name: key },
+          relations: ['posts'],
+        });
         if (dbData) {
           const userData = JSON.stringify(dbData);
           const ttl = 3600;
@@ -142,8 +143,10 @@ export class UsersService {
   async update(name: string, updateUserDto: UpdateUserDto) {
     try {
       const existingUser = await this.redisService.get(`User:${name}`);
-      const existingUserDB = await this.userRepository.findOne({where: {name: updateUserDto.name}})
-      if (!existingUser || existingUserDB) {
+      const existingUserDB = await this.userRepository.findOne({
+        where: { name: updateUserDto.name },
+      });
+      if (!existingUser || !existingUserDB) {
         return {
           statusCode: 400,
           message: `Không tìm thấy user ${name}`,
@@ -191,10 +194,17 @@ export class UsersService {
       const parsedUser = JSON.parse(data) as User;
       if (data) {
         // xóa các post liên quan với user bị xóa
-        await this.postsService.deletePostsByUser(parsedUser);
+        const check_posts = await this.postsService.findAllByUser(
+          parsedUser.id,
+        );
+        if (check_posts.length > 0) {
+          for (const post of check_posts) {
+            await this.postsService.remove(post.title);
+          }
+        }
 
         await this.redisService.del(`User:${key}`); // Xóa 1 key
-        await this.userRepository.delete(parsedUser);
+        await this.userRepository.delete(parsedUser.id);
         return {
           statusCode: 204,
           message: `Đã xóa user ${key}`,
@@ -224,14 +234,21 @@ export class UsersService {
         for (const key of userKeys) {
           const data = await this.redisService.get(key);
           const parsedUser = JSON.parse(data) as User;
-          
+
           if (data) {
             // Xóa các bài viết liên quan đến người dùng
-            await this.postsService.deletePostsByUser(parsedUser);
-            // Xóa key người dùng trong Redis
-            await this.redisService.del(key);
-            // Xóa người dùng trong cơ sở dữ liệu
-            await this.userRepository.delete(parsedUser);
+            // xóa các post liên quan với user bị xóa
+            const check_posts = await this.postsService.findAllByUser(
+              parsedUser.id,
+            );
+            if (check_posts.length > 0) {
+              for (const post of check_posts) {
+                await this.postsService.remove(post.title);
+              }
+            }
+
+            await this.redisService.del(key); // Xóa key người dùng trong Redis
+            await this.userRepository.delete(parsedUser.id); // Xóa người dùng trong cơ sở dữ liệu
           }
         }
         return {

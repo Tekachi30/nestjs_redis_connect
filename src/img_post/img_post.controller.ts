@@ -23,7 +23,7 @@ export class ImgPostController {
   create(
     @Body() createImgPostDto: CreateImgPostDto,
     @UploadedFile() file: Express.Multer.File,
-    @Param('id') id: number,
+    @Param('id') id: string,
   ) {
     return this.imgPostService.create(createImgPostDto, file, id);
   }
@@ -33,18 +33,24 @@ export class ImgPostController {
     return this.imgPostService.findAll();
   }
 
+  // @Get(':id')
+  // findAll(@Param('id') id: string) {
+  //   return this.imgPostService.findAllImgByPost();
+  // }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.imgPostService.findOne(+id);
   }
+
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateImgPostDto: UpdateImgPostDto) {
     return this.imgPostService.update(+id, updateImgPostDto);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.imgPostService.remove(+id);
+  @Delete(':key')
+  remove(@Param('key') key: string) {
+    return this.imgPostService.remove(key);
   }
 }

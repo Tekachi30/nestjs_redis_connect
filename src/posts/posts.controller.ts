@@ -11,7 +11,7 @@ export class PostsController {
   @Post(':id')
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(CustomValidationPipe)
-  create(@Body() createPostDto: CreatePostDto, @Param('id') id: number) {
+  create(@Body() createPostDto: CreatePostDto, @Param('id') id: string) {
     return this.postsService.create(createPostDto, id);
   }
 

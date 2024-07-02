@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
@@ -12,7 +13,7 @@ import {
 @Entity({ name: 'img_posts' })
 export class ImgPost {
   @PrimaryGeneratedColumn('uuid')
-  id: number;
+  id: string;
 
   @Column({ nullable: false })
   img_url: string;
@@ -35,5 +36,5 @@ export class ImgPost {
 
   // Các ràng buộc:
   @ManyToOne(() => Post, (post) => post.img_posts)
-  post: Post;
+  post: Post; 
 }
